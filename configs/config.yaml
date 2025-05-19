@@ -1,0 +1,7 @@
+dpi: 300
+workers: 4
+gemini_model: "gemini-2.5-flash-preview-04-17"
+max_retries: 3
+retry_backoff: 2        # 初回1秒, 次回2秒, その次4秒…
+log_level: "INFO"
+output_dir: "output"

@@ -1,0 +1,23 @@
+[project]
+name = "pdf-reader-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+
+
+dependencies = [
+    "google-genai>=1.15.0",
+    "google-generativeai>=0.8.5",
+    "pdf2image>=1.17.0",
+    "pdfplumber>=0.11.6",
+    "pydantic>=2.11.4",
+    "python-dotenv>=1.1.0",
+    "pyyaml>=6.0.2",
+    "tqdm>=4.67.1",
+]
+
+[tool.ruff]
+line-length = 120
+[tool.ruff.lint]
+select = ["E", "F", "I"]
