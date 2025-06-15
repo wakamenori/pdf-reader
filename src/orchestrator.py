@@ -25,7 +25,7 @@ from text_extractor import extract_text_lines
 
 
 def load_config(config_path):
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -47,14 +47,11 @@ def setup_logger(log_dir, log_level):
 def parse_args():
     parser = argparse.ArgumentParser(description="PDF → Markdown 変換パイプライン")
     parser.add_argument("pdf_path", type=str, help="入力PDFファイルパス")
-    parser.add_argument(
-        "--config", type=str, default="configs/config.yaml", help="設定ファイルパス"
-    )
+    parser.add_argument("--config", type=str, default="configs/config.yaml", help="設定ファイルパス")
     parser.add_argument("--workers", type=int, help="並列ワーカー数")
     parser.add_argument("--dpi", type=int, help="画像DPI")
-    parser.add_argument(
-        "--resume-from", type=int, default=1, help="このページ番号から再開（1始まり）"
-    )
+    parser.add_argument("--resume-from", type=int, default=1, help="このページ番号から再開(1始まり)")
+    parser.add_argument("--output-dir", type=str, help="出力ディレクトリ(デフォルト: config.yamlのoutput_dir)")
     return parser.parse_args()
 
 
@@ -66,7 +63,7 @@ def main():
     workers = args.workers if args.workers else config.get("workers", 4)
     dpi = args.dpi if args.dpi else config.get("dpi", 300)
     log_level = config.get("log_level", "INFO")
-    output_dir = config.get("output_dir", "output")
+    output_dir = args.output_dir if args.output_dir else config.get("output_dir", "output")
 
     # タイムスタンプ付き出力ディレクトリ
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -89,17 +86,18 @@ def main():
 
     logger.info(f"Total pages: {num_pages}")
 
-    # 再開ページ番号（1始まり→0始まりに変換）
+    # 再開ページ番号(1始まり→0始まりに変換)
     resume_from = max(args.resume_from - 1, 0)
 
     # Page Worker 処理
-    gemini_model = config.get("gemini_model", "gemini-2.5-flash-preview-04-17")
+    gemini_model = config.get("gemini_model", "gemini-2.5-flash-preview-05-20")
     max_retries = config.get("max_retries", 3)
     retry_backoff = config.get("retry_backoff", 2)
+
     def process_page(page_num):
         logger.info(f"Started page {page_num + 1}")
         # 1. テキスト抽出
-        draft_md = extract_text_lines(args.pdf_path, page_num, dpi)
+        draft_md = extract_text_lines(args.pdf_path, page_num)
         # 2. Markdown整形
         md = draft_markdown(draft_md)
         # 3. 画像生成
@@ -110,7 +108,7 @@ def main():
         # 5. パッチ適用
         fixed_md = apply_patch(md, answer)
         # 6. ページ保存
-        page_md_path = store_page(fixed_md, page_num, pages_dir, image_path)
+        page_md_path = store_page(fixed_md, page_num, pages_dir)
         logger.info(f"Finished page {page_num + 1}")
         return page_md_path, price
 
@@ -119,9 +117,7 @@ def main():
     total_price = 0.0
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # resume_from未満のページはスキップ
-        futures = {
-            executor.submit(process_page, i): i for i in range(resume_from, num_pages)
-        }
+        futures = {executor.submit(process_page, i): i for i in range(resume_from, num_pages)}
         for future in as_completed(futures):
             page_md_path, price = future.result()
             page_md_paths.append(page_md_path)
@@ -132,7 +128,7 @@ def main():
     page_md_paths.sort()
 
     # アセンブル
-    final_md_path = assemble_final_md(page_md_paths, run_output_dir, images_dir)
+    final_md_path = assemble_final_md(page_md_paths, run_output_dir, images_dir, args.pdf_path)
     logger.info(f"Output: {final_md_path}")
 
 

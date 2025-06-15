@@ -17,7 +17,17 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "coverage>=7.9.1",
+    "ruff>=0.7.0",
+    "mypy>=1.16.0",
+    "types-pyyaml>=6.0.12.20250516",
+]
+
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "ARG", "B", "C4", "SIM", "UP", "RUF", "N"]

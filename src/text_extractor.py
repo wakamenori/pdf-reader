@@ -7,17 +7,16 @@ pdfplumber を用いて PDF ページから行番号付きテキストを抽出�
 import pdfplumber
 
 
-def extract_text_lines(pdf_path, page_num, dpi=300):
+def extract_text_lines(pdf_path, page_num):
     """
-    指定したPDFページから行番号付きテキスト（L001: ...）を抽出する。
+    指定したPDFページから行番号付きテキスト(L001: ...)を抽出する。
 
     Args:
         pdf_path (str): PDFファイルのパス
         page_num (int): 0始まりのページ番号
-        dpi (int): 画像DPI（未使用だがインターフェース統一のため）
 
     Returns:
-        str: 行番号付きDraft Markdown（1ページ分）
+        str: 行番号付きDraft Markdown(1ページ分)
     """
     with pdfplumber.open(pdf_path) as pdf:
         page = pdf.pages[page_num]

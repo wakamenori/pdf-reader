@@ -7,15 +7,14 @@ page_store.py
 import os
 
 
-def store_page(fixed_md, page_num, pages_dir, image_path):
+def store_page(fixed_md, page_num, pages_dir):
     """
     校正版Markdownをページごとに保存する。
 
     Args:
-        fixed_md (str): 校正済みMarkdown（行番号付き）
+        fixed_md (str): 校正済みMarkdown(行番号付き)
         page_num (int): 0始まりのページ番号
         pages_dir (str): Markdown保存ディレクトリ
-        image_path (str): 画像ファイルパス（未使用、インターフェース統一のため）
 
     Returns:
         str: 保存したMarkdownファイルのパス

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(nvim:*)",
+      "Bash(grep:*)",
+      "Bash(uv run:*)",
+      "Bash(pdfinfo:*)",
+      "Bash(rg:*)",
+      "Bash(ruff check:*)"
+    ],
+    "deny": []
+  }
+}
