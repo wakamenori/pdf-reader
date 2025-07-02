@@ -36,32 +36,38 @@ The system follows a pipeline architecture with these core components:
 ### Running the System
 
 ```bash
-# Basic usage
-uv run python src/orchestrator.py sample.pdf
+# Basic usage (recommended)
+make run PDF=sample.pdf
 
 # With custom settings
-uv run python src/orchestrator.py sample.pdf \
-  --config configs/config.yaml \
-  --workers 6 \
-  --dpi 400 \
-  --resume-from 5
+make run PDF=sample.pdf ARGS="--config configs/config.yaml --workers 6 --dpi 400"
 
 # Resume from specific page (1-indexed)
-uv run python src/orchestrator.py sample.pdf --resume-from 10
+make run PDF=sample.pdf ARGS="--resume-from 10"
+
+# Alternative: Direct uv usage (if preferred)
+uv run python src/orchestrator.py sample.pdf
+uv run python src/orchestrator.py sample.pdf --workers 6 --dpi 400 --resume-from 5
 ```
 
 ### Development Commands
 
 ```bash
-# Setup environment
-uv venv .venv
-source .venv/bin/activate
-uv sync
+# Setup environment (recommended)
+make setup
 
-# Code linting and formatting
-uv run ruff check src/        # Lint check
-uv run ruff format src/       # Format code
-uv run mypy src/ --ignore-missing-imports  # Type check
+# Code quality (recommended)
+make lint         # Lint check
+make format       # Format code  
+make typecheck    # Type check
+make test         # Run tests
+make clean        # Clean output files
+
+# Alternative: Direct uv usage
+uv venv .venv && source .venv/bin/activate && uv sync
+uv run ruff check src/
+uv run ruff format src/
+uv run mypy src/ --ignore-missing-imports
 ```
 
 ### Prerequisites

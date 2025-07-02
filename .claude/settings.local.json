@@ -8,7 +8,8 @@
       "Bash(uv run:*)",
       "Bash(pdfinfo:*)",
       "Bash(rg:*)",
-      "Bash(ruff check:*)"
+      "Bash(ruff check:*)",
+      "Bash(make:*)"
     ],
     "deny": []
   }
