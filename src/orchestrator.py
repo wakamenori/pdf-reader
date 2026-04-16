@@ -128,8 +128,9 @@ def main():
     page_md_paths.sort()
 
     # アセンブル
-    final_md_path = assemble_final_md(page_md_paths, run_output_dir, images_dir, args.pdf_path)
-    logger.info(f"Output: {final_md_path}")
+    with_images_path, pure_path = assemble_final_md(page_md_paths, run_output_dir, images_dir, args.pdf_path)
+    logger.info(f"Output (with images): {with_images_path}")
+    logger.info(f"Output (pure markdown): {pure_path}")
 
 
 if __name__ == "__main__":
