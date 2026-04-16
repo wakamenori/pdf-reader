@@ -4,7 +4,6 @@ gemini_client.py
 Gemini 2.0 Flash-Lite API へリクエストし、パッチを取得するモジュール。
 """
 
-import json
 import os
 import pprint
 import re
@@ -13,7 +12,6 @@ import time
 import google.genai as genai
 from dotenv import load_dotenv
 from google.genai import types
-from google.oauth2 import service_account
 
 from models import Answer
 
@@ -39,13 +37,10 @@ def get_gemini_patch(md, image_path, model_name, max_retries, retry_backoff) -> 
         tuple[Answer, float]: (パッチリスト(Pydanticモデルのリスト), 料金[ドル])
     """
     load_dotenv()
-    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_VERTEX_AI")
-    if not service_account_json:
-        raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_VERTEX_AI is not set in .env")
-    service_account_info = json.loads(service_account_json)
-    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-    credentials = service_account.Credentials.from_service_account_info(service_account_info).with_scopes(scopes)
-    client = genai.Client(credentials=credentials)
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set in .env")
+    client = genai.Client(api_key=api_key)
     prompt = """
         以下のMarkdownテキスト(行番号付き)と、その元になったページ画像をあたえます。
         マークダウンテキストを画像と比較し、テキストが適切でない部分を探し、見つかれば修正を提案してください。

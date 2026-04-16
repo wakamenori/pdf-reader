@@ -90,7 +90,7 @@ def main():
     resume_from = max(args.resume_from - 1, 0)
 
     # Page Worker 処理
-    gemini_model = config.get("gemini_model", "gemini-2.5-flash-preview-05-20")
+    gemini_model = config.get("gemini_model", "gemini-3.1-flash-lite-preview")
     max_retries = config.get("max_retries", 3)
     retry_backoff = config.get("retry_backoff", 2)
 
