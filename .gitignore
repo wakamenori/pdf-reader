@@ -1,7 +1,8 @@
 .env
 output
-.venv
-.ruff_cache
 logs
-__pycache__/
 .claude/settings.local.json
+
+# Node.js
+node_modules/
+dist/

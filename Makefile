@@ -1,7 +1,4 @@
 # PDF Reader Makefile
-#
-# This Makefile provides convenient commands to run the PDF reader
-# instead of having to use 'uv run' directly.
 
 .PHONY: help run setup lint format typecheck test clean
 
@@ -18,7 +15,7 @@ help:
 	@echo "    make run PDF=sample.pdf ARGS='--resume-from 10'"
 	@echo ""
 	@echo "  Development commands:"
-	@echo "    make setup    - Setup development environment"
+	@echo "    make setup    - Install dependencies"
 	@echo "    make lint     - Run code linting"
 	@echo "    make format   - Format code"
 	@echo "    make typecheck- Run type checking"
@@ -32,35 +29,31 @@ ifndef PDF
 	@echo "Usage: make run PDF=<filename> [ARGS='additional args']"
 	@exit 1
 endif
-	uv run python src/orchestrator.py $(PDF) $(ARGS)
+	pnpm tsx src/orchestrator.ts $(PDF) $(ARGS)
 
-# Development environment setup
+# Install dependencies
 setup:
-	uv venv .venv
-	uv sync
+	pnpm install
 
 # Code quality commands
 lint:
-	uv run ruff check src/
+	pnpm biome check src/
 
 format:
-	uv run ruff format src/
+	pnpm biome format --write src/
 
 typecheck:
-	uv run mypy src/ --ignore-missing-imports
+	pnpm tsc --noEmit
 
 # Testing
 test:
-	uv run pytest
+	pnpm vitest run
 
-test-coverage:
-	uv run pytest --cov=src --cov-report=html
+test-watch:
+	pnpm vitest
 
 # Cleanup
 clean:
 	rm -rf output/
 	rm -rf logs/
-	rm -rf .coverage
-	rm -rf htmlcov/
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
+	rm -rf dist/
