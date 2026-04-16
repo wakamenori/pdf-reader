@@ -5,6 +5,7 @@ import { assembleFinalMd } from "./assembler.js";
 import { parseConfig } from "./config.js";
 import { getGeminiPatch } from "./gemini-client.js";
 import { draftMarkdown } from "./markdown-drafter.js";
+import { validateAndFixMermaid } from "./mermaid-validator.js";
 import { storePage } from "./page-store.js";
 import { applyPatch } from "./patch-applier.js";
 import { rasterizePage } from "./rasterizer.js";
@@ -77,18 +78,26 @@ async function main() {
 		// 3. 画像生成
 		const imagePath = await rasterizePage(config.pdfPath, pageNum, config.dpi, imagesDir);
 		// 4. Geminiパッチ取得
-		const [answer, price] = await getGeminiPatch(
+		const [answer, patchCost] = await getGeminiPatch(
 			md,
 			imagePath,
 			config.geminiModel,
 			config.maxRetries,
 			config.retryBackoff,
 		);
-		logger.info(`Gemini patch cost: $${price.toFixed(4)}`);
+		logger.info(`Gemini patch cost: $${patchCost.toFixed(4)}`);
 		// 5. パッチ適用
 		const fixedMd = applyPatch(md, answer);
+		// 5.5 mermaid検証・修正
+		const { md: validatedMd, cost: mermaidCost } = await validateAndFixMermaid(
+			fixedMd,
+			config.geminiModel,
+			config.mermaidMaxRetries,
+			config.retryBackoff,
+		);
+		const price = patchCost + mermaidCost;
 		// 6. ページ保存
-		const pageMdPath = storePage(fixedMd, pageNum, pagesDir);
+		const pageMdPath = storePage(validatedMd, pageNum, pagesDir);
 		logger.info(`Finished page ${pageNum + 1}`);
 
 		return [pageMdPath, price];

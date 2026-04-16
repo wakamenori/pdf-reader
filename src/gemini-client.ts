@@ -1,6 +1,22 @@
 import { readFileSync } from "node:fs";
-import { GoogleGenAI } from "@google/genai";
+import { type GenerateContentResponse, GoogleGenAI } from "@google/genai";
+import { z } from "zod/v4";
 import { type Answer, AnswerSchema, getAnswerJsonSchema } from "./models.js";
+
+function createGeminiClient(): GoogleGenAI {
+	const apiKey = process.env.GEMINI_API_KEY;
+	if (!apiKey) {
+		throw new Error("GEMINI_API_KEY is not set in .env");
+	}
+	return new GoogleGenAI({ apiKey });
+}
+
+function calculateCost(response: GenerateContentResponse): number {
+	const usageMetadata = response.usageMetadata;
+	const inputTokens = usageMetadata?.promptTokenCount ?? 0;
+	const outputTokens = usageMetadata?.candidatesTokenCount ?? 0;
+	return (inputTokens / 1_000_000) * 0.15 + (outputTokens / 1_000_000) * 0.6;
+}
 
 const PROMPT = `
 以下のMarkdownテキスト(行番号付き)と、その元になったページ画像をあたえます。
@@ -47,12 +63,7 @@ export async function getGeminiPatch(
 	maxRetries: number,
 	retryBackoff: number,
 ): Promise<[Answer, number]> {
-	const apiKey = process.env.GEMINI_API_KEY;
-	if (!apiKey) {
-		throw new Error("GEMINI_API_KEY is not set in .env");
-	}
-
-	const client = new GoogleGenAI({ apiKey });
+	const client = createGeminiClient();
 	const imageData = readFileSync(imagePath);
 	const base64Image = imageData.toString("base64");
 
@@ -83,16 +94,7 @@ export async function getGeminiPatch(
 			const answer = AnswerSchema.parse(parsed);
 			console.log(JSON.stringify(answer, null, 2));
 
-			const usageMetadata = response.usageMetadata;
-			if (!usageMetadata?.promptTokenCount || !usageMetadata?.candidatesTokenCount) {
-				throw new Error("usage_metadataからトークン数が取得できませんでした");
-			}
-
-			const inputPrice = (usageMetadata.promptTokenCount / 1_000_000) * 0.15;
-			const outputPrice = (usageMetadata.candidatesTokenCount / 1_000_000) * 0.6;
-			const totalPrice = inputPrice + outputPrice;
-
-			return [answer, totalPrice];
+			return [answer, calculateCost(response)];
 		} catch (e) {
 			lastException = e as Error;
 			const waitTime = retryBackoff * 2 ** (attempt - 1);
@@ -102,4 +104,72 @@ export async function getGeminiPatch(
 	}
 
 	throw new Error(`Gemini APIの呼び出しに${maxRetries}回失敗しました: ${lastException}`);
+}
+
+const MERMAID_FIX_PROMPT = `
+以下のmermaidコードに構文エラーがあります。エラーメッセージを参考に修正してください。
+修正したmermaidコードだけをfixedフィールドに返してください。
+\`\`\`mermaid や \`\`\` の囲みは不要です。コードの中身だけを返してください。
+
+# mermaid構文ルール
+- ノードラベルは必ずダブルクォートで囲む
+- 各ノード定義・接続は必ず1行で書く
+- 有効なノード形状: 四角 A["text"]  角丸 A("text")  ひし形 A{"text"}  円柱 A[("text")]  六角形 A{{"text"}}
+- 開き括弧と閉じ括弧を正確に対応させること
+`;
+
+const MermaidFixSchema = z.object({
+	fixed: z.string().describe("修正後のmermaidコード"),
+});
+
+/**
+ * mermaidコードとエラーメッセージをGeminiに送り、修正版を取得する。
+ */
+export async function fixMermaidWithGemini(
+	mermaidCode: string,
+	error: string,
+	modelName: string,
+	retryBackoff: number,
+): Promise<[string, number]> {
+	const client = createGeminiClient();
+	const maxAttempts = 2;
+	let lastException: Error | null = null;
+
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			const response = await client.models.generateContent({
+				model: modelName,
+				contents: [
+					{
+						role: "user",
+						parts: [
+							{ text: MERMAID_FIX_PROMPT },
+							{ text: `## mermaidコード\n${mermaidCode}` },
+							{ text: `## エラーメッセージ\n${error}` },
+						],
+					},
+				],
+				config: {
+					responseMimeType: "application/json",
+					responseSchema: z.toJSONSchema(MermaidFixSchema) as Record<string, unknown>,
+				},
+			});
+
+			const responseText = response.text;
+			if (!responseText) {
+				throw new Error("Gemini APIからレスポンステキストが取得できませんでした");
+			}
+
+			const parsed = MermaidFixSchema.parse(JSON.parse(responseText));
+
+			return [parsed.fixed, calculateCost(response)];
+		} catch (e) {
+			lastException = e as Error;
+			const waitTime = retryBackoff * 2 ** (attempt - 1);
+			console.log(`[Mermaid Fix] API エラー(${attempt}回目): ${e}. ${waitTime}秒後にリトライします。`);
+			await new Promise((resolve) => setTimeout(resolve, waitTime * 1000));
+		}
+	}
+
+	throw new Error(`Mermaid修正のGemini API呼び出しに失敗しました: ${lastException}`);
 }

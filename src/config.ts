@@ -13,6 +13,7 @@ export interface AppConfig {
 	logLevel: string;
 	outputDir: string;
 	resumeFrom: number;
+	mermaidMaxRetries: number;
 }
 
 interface YamlConfig {
@@ -23,6 +24,7 @@ interface YamlConfig {
 	retry_backoff?: number;
 	log_level?: string;
 	output_dir?: string;
+	mermaid_max_retries?: number;
 }
 
 function loadYamlConfig(configPath: string): YamlConfig {
@@ -66,5 +68,6 @@ export function parseConfig(): AppConfig {
 		logLevel: yamlConfig.log_level ?? "INFO",
 		outputDir: args.outputDir ?? yamlConfig.output_dir ?? "output",
 		resumeFrom: args.resumeFrom,
+		mermaidMaxRetries: yamlConfig.mermaid_max_retries ?? 2,
 	};
 }
