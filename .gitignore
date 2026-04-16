@@ -4,3 +4,4 @@ output
 .ruff_cache
 logs
 __pycache__/
+.claude/settings.local.json
