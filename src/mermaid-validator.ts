@@ -78,6 +78,7 @@ export async function validateAndFixMermaid(
 	modelName: string,
 	maxRetries: number,
 	retryBackoff: number,
+	pageNum: number,
 ): Promise<{ md: string; cost: number }> {
 	const blocks = extractMermaidBlocks(md);
 	if (blocks.length === 0) {
@@ -102,7 +103,7 @@ export async function validateAndFixMermaid(
 			continue;
 		}
 
-		logger.debug(`[Mermaid] 構文エラー検出:\n${validation.error}`);
+		logger.debug(`[Mermaid] p.${pageNum + 1} 構文エラー検出:\n${validation.error}`);
 
 		let fixed: string | null = null;
 		let currentCode = normalizedCode;
@@ -131,7 +132,9 @@ export async function validateAndFixMermaid(
 			const replacement = `\`\`\`mermaid\n${fixed}\`\`\``;
 			result = result.slice(0, block.start) + replacement + result.slice(block.end);
 		} else {
-			logger.warn(`[Mermaid] ${maxRetries}回の修正に失敗。元のコードブロックのまま残します。`);
+			logger.warn(
+				`[Mermaid] p.${pageNum + 1} ${maxRetries}回の修正に失敗。元のコードブロックのまま残します。`,
+			);
 		}
 	}
 

@@ -74,6 +74,7 @@ async function main() {
 			config.geminiModel,
 			config.mermaidMaxRetries,
 			config.retryBackoff,
+			pageNum,
 		);
 		const price = patchCost + mermaidCost;
 		// 6. ページ保存
