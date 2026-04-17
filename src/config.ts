@@ -78,7 +78,7 @@ export function parseConfig(): AppConfig {
 		retryBackoff: yamlConfig.retry_backoff ?? 2,
 		logLevel: args.verbose ? "debug" : normalizeLogLevel(yamlConfig.log_level),
 		resumeFrom: args.resumeFrom,
-		mermaidMaxRetries: yamlConfig.mermaid_max_retries ?? 2,
+		mermaidMaxRetries: yamlConfig.mermaid_max_retries ?? 5,
 		withImages: args.withImages,
 	};
 }

@@ -71,7 +71,7 @@ export async function validateMermaid(code: string): Promise<{ valid: boolean; e
 
 /**
  * Markdown内の全mermaidブロックを検証し、エラーがあればGeminiで修正する。
- * 全リトライ失敗時は <alt_image> にフォールバックする。
+ * 全リトライ失敗時は元のmermaidコードブロックをそのまま残す。
  */
 export async function validateAndFixMermaid(
 	md: string,
@@ -131,9 +131,7 @@ export async function validateAndFixMermaid(
 			const replacement = `\`\`\`mermaid\n${fixed}\`\`\``;
 			result = result.slice(0, block.start) + replacement + result.slice(block.end);
 		} else {
-			logger.warn(`[Mermaid] ${maxRetries}回の修正に失敗。<alt_image>にフォールバックします。`);
-			const fallback = `<alt_image title="図">\n${block.code.trim()}\n</alt_image>`;
-			result = result.slice(0, block.start) + fallback + result.slice(block.end);
+			logger.warn(`[Mermaid] ${maxRetries}回の修正に失敗。元のコードブロックのまま残します。`);
 		}
 	}
 
