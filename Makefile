@@ -13,6 +13,7 @@ help:
 	@echo "    make run PDF=sample.pdf"
 	@echo "    make run PDF=sample.pdf ARGS='--workers 6 --dpi 400'"
 	@echo "    make run PDF=sample.pdf ARGS='--resume-from 10'"
+	@echo "    make run PDF=sample.pdf ARGS='--with-images'"
 	@echo ""
 	@echo "  Development commands:"
 	@echo "    make setup    - Install dependencies"
@@ -54,6 +55,5 @@ test-watch:
 
 # Cleanup
 clean:
-	rm -rf output/
-	rm -rf logs/
+	rm -rf /tmp/pdf-reader/
 	rm -rf dist/

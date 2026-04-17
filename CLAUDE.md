@@ -63,7 +63,7 @@ make lint         # Biome lint check
 make format       # Biome format
 make typecheck    # tsc --noEmit
 make test         # vitest run
-make clean        # Clean output/logs/dist
+make clean        # Clean /tmp/pdf-reader and dist
 ```
 
 ### Prerequisites
@@ -77,14 +77,22 @@ make clean        # Clean output/logs/dist
 
 ## Output Structure
 
-Each run creates a timestamped directory in `output/`:
+最終成果物は **入力PDFと同じディレクトリ** に書き出される。中間生成物とログは `/tmp/pdf-reader/<timestamp>/` に置かれる。
 
 ```
-output/YYYYMMDD_HHMM/
-├── pages/           # Individual page markdown files
-├── images/          # PNG images of each page
-└── sample.md         # Assembled final document
+<input PDF dir>/
+├── sample.pdf
+├── sample.md                  # pure markdown (デフォルト出力)
+├── sample.with-images.md      # --with-images 指定時のみ
+└── sample_images/             # --with-images 指定時のみ (ページ画像)
+
+/tmp/pdf-reader/YYYYMMDD_HHMM/
+├── pages/        # ページ別中間markdown
+├── images/       # ページ画像 (ラスタライズ結果)
+└── run.log       # 実行ログ
 ```
+
+同名ファイルが既に存在する場合は `sample_2.md`, `sample_3.md`... と連番が付与される。
 
 ## Configuration Details
 

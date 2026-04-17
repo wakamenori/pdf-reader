@@ -21,9 +21,9 @@ function formatTimestamp(): string {
 	return `${y}${mo}${d}_${h}${mi}`;
 }
 
-function createLogger(logDir: string, timestamp: string) {
+function createLogger(logDir: string) {
 	mkdirSync(logDir, { recursive: true });
-	const logFile = path.join(logDir, `run_${timestamp}.log`);
+	const logFile = path.join(logDir, "run.log");
 	writeFileSync(logFile, "", "utf-8");
 
 	return {
@@ -49,16 +49,17 @@ async function main() {
 	const config = parseConfig();
 	const timestamp = formatTimestamp();
 
-	// タイムスタンプ付き出力ディレクトリ
-	const runOutputDir = path.join(config.outputDir, timestamp);
+	// 中間生成物は /tmp/pdf-reader/<timestamp>/ に置く
+	const runOutputDir = path.join("/tmp", "pdf-reader", timestamp);
 	const pagesDir = path.join(runOutputDir, "pages");
 	const imagesDir = path.join(runOutputDir, "images");
 	mkdirSync(pagesDir, { recursive: true });
 	mkdirSync(imagesDir, { recursive: true });
 
-	// ログ初期化
-	const logger = createLogger("logs", timestamp);
+	// ログ初期化(中間生成物と同じdirへ)
+	const logger = createLogger(runOutputDir);
 	logger.info(`Started processing: ${config.pdfPath}`);
+	logger.info(`Intermediate dir: ${runOutputDir}`);
 
 	// PDFページ数取得
 	const numPages = await getPageCount(config.pdfPath);
@@ -120,10 +121,17 @@ async function main() {
 	// ページ順に並べ替え
 	pageMdPaths.sort();
 
-	// アセンブル
-	const [withImagesPath, purePath] = assembleFinalMd(pageMdPaths, runOutputDir, imagesDir, config.pdfPath);
-	logger.info(`Output (with images): ${withImagesPath}`);
-	logger.info(`Output (pure markdown): ${purePath}`);
+	// アセンブル(入力PDFと同じdirへ書き出す)
+	const { purePath, withImagesPath } = assembleFinalMd({
+		pageMdPaths,
+		imagesDir,
+		pdfPath: config.pdfPath,
+		withImages: config.withImages,
+	});
+	logger.info(`Output: ${purePath}`);
+	if (withImagesPath) {
+		logger.info(`Output (with images): ${withImagesPath}`);
+	}
 }
 
 main().catch((err) => {

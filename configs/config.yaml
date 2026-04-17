@@ -4,5 +4,4 @@ gemini_model: "gemini-3.1-flash-lite-preview"
 max_retries: 3
 retry_backoff: 2        # 初回1秒, 次回2秒, その次4秒…
 log_level: "INFO"
-output_dir: "output"
 mermaid_max_retries: 2    # mermaid構文エラー時のGemini修正リトライ回数

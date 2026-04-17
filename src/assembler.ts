@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -24,18 +24,67 @@ function fixUnclosedCodeBlocks(pageMd: string, pageNum: number): string {
 }
 
 /**
- * ページMDを番号順に連結し、2種類のMDファイルを生成する。
- * - 画像付きバージョン: ページ先頭に元のページ画像リンクを挿入
- * - ピュアMarkdownバージョン: テキストのみ
+ * 同名ファイルを避けて連番(_2, _3, ...)を付与したパスを返す。
  */
-export function assembleFinalMd(
-	pageMdPaths: string[],
-	runOutputDir: string,
-	imagesDir: string,
-	pdfFilename: string,
-): [string, string] {
-	const pagesWithImages: string[] = [];
+function uniquePath(dir: string, basename: string, suffix: string): string {
+	let candidate = path.join(dir, `${basename}${suffix}`);
+	if (!existsSync(candidate)) return candidate;
+	let i = 2;
+	while (true) {
+		candidate = path.join(dir, `${basename}_${i}${suffix}`);
+		if (!existsSync(candidate)) return candidate;
+		i++;
+	}
+}
+
+/**
+ * 同名dirを避けて連番付与したパスを返す。
+ */
+function uniqueDirPath(dir: string, name: string): string {
+	let candidate = path.join(dir, name);
+	if (!existsSync(candidate)) return candidate;
+	let i = 2;
+	while (true) {
+		candidate = path.join(dir, `${name}_${i}`);
+		if (!existsSync(candidate)) return candidate;
+		i++;
+	}
+}
+
+export interface AssembleOptions {
+	pageMdPaths: string[];
+	imagesDir: string;
+	pdfPath: string;
+	withImages: boolean;
+}
+
+export interface AssembleResult {
+	purePath: string;
+	withImagesPath: string | null;
+}
+
+/**
+ * ページMDを番号順に連結し、入力PDFと同じdirへ書き出す。
+ * - デフォルト: pure MD のみ (`<basename>.md`)
+ * - withImages 指定時: 加えて `<basename>.with-images.md` と `<basename>_images/` を出力
+ */
+export function assembleFinalMd(opts: AssembleOptions): AssembleResult {
+	const { pageMdPaths, imagesDir, pdfPath, withImages } = opts;
+
+	const outputDir = path.dirname(path.resolve(pdfPath));
+	const basename = path.basename(pdfPath, path.extname(pdfPath));
+
 	const pagesPure: string[] = [];
+	const pagesWithImages: string[] = [];
+
+	// withImages の場合は画像コピー先 dir を準備
+	let imagesOutDir: string | null = null;
+	let imagesOutDirName: string | null = null;
+	if (withImages) {
+		imagesOutDir = uniqueDirPath(outputDir, `${basename}_images`);
+		imagesOutDirName = path.basename(imagesOutDir);
+		mkdirSync(imagesOutDir, { recursive: true });
+	}
 
 	for (let i = 0; i < pageMdPaths.length; i++) {
 		const mdPath = pageMdPaths[i];
@@ -44,30 +93,34 @@ export function assembleFinalMd(
 
 		// 行番号除去
 		pageMd = pageMd.replace(/^L\d{3}:\s?/gm, "");
-
 		// 閉じられていないコードブロックを修正
 		pageMd = fixUnclosedCodeBlocks(pageMd, pageNum);
 
 		pagesPure.push(`<!-- page ${pageNum} -->\n\n${pageMd.trim()}`);
 
-		// ページ先頭に画像リンクを挿入したバージョン
-		const imageName = `page_${String(pageNum).padStart(3, "0")}.png`;
-		const imageRelPath = path.relative(runOutputDir, path.join(imagesDir, imageName));
-		const pageWithImage = `![page ${pageNum}](${imageRelPath})\n\n${pageMd}`;
-		pagesWithImages.push(pageWithImage.trim());
+		if (withImages && imagesOutDirName) {
+			const imageName = `page_${String(pageNum).padStart(3, "0")}.png`;
+			const imageRelPath = `${imagesOutDirName}/${imageName}`;
+			pagesWithImages.push(`![page ${pageNum}](${imageRelPath})\n\n${pageMd}`.trim());
+		}
 	}
 
-	const basename = path.basename(pdfFilename, path.extname(pdfFilename));
+	// 画像コピー
+	if (withImages && imagesOutDir) {
+		for (const file of readdirSync(imagesDir)) {
+			copyFileSync(path.join(imagesDir, file), path.join(imagesOutDir, file));
+		}
+	}
 
-	// 画像付きバージョン
-	const finalWithImages = pagesWithImages.join("\n\n---\n\n");
-	const withImagesPath = path.join(runOutputDir, `${basename}.md`);
-	writeFileSync(withImagesPath, finalWithImages, "utf-8");
+	// pure MD 書き出し
+	const purePath = uniquePath(outputDir, basename, ".md");
+	writeFileSync(purePath, pagesPure.join("\n\n---\n\n"), "utf-8");
 
-	// ピュアMarkdownバージョン
-	const finalPure = pagesPure.join("\n\n---\n\n");
-	const purePath = path.join(runOutputDir, `${basename}_pure.md`);
-	writeFileSync(purePath, finalPure, "utf-8");
+	let withImagesPath: string | null = null;
+	if (withImages) {
+		withImagesPath = uniquePath(outputDir, basename, ".with-images.md");
+		writeFileSync(withImagesPath, pagesWithImages.join("\n\n---\n\n"), "utf-8");
+	}
 
-	return [withImagesPath, purePath];
+	return { purePath, withImagesPath };
 }

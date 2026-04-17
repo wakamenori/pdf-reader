@@ -11,9 +11,9 @@ export interface AppConfig {
 	maxRetries: number;
 	retryBackoff: number;
 	logLevel: string;
-	outputDir: string;
 	resumeFrom: number;
 	mermaidMaxRetries: number;
+	withImages: boolean;
 }
 
 interface YamlConfig {
@@ -23,7 +23,6 @@ interface YamlConfig {
 	max_retries?: number;
 	retry_backoff?: number;
 	log_level?: string;
-	output_dir?: string;
 	mermaid_max_retries?: number;
 }
 
@@ -44,7 +43,7 @@ export function parseConfig(): AppConfig {
 		.option("--workers <number>", "並列ワーカー数", Number.parseInt)
 		.option("--dpi <number>", "画像DPI", Number.parseInt)
 		.option("--resume-from <number>", "このページ番号から再開(1始まり)", Number.parseInt, 1)
-		.option("--output-dir <path>", "出力ディレクトリ")
+		.option("--with-images", "ページ画像付きの .with-images.md も出力する", false)
 		.parse();
 
 	const args = program.opts<{
@@ -52,7 +51,7 @@ export function parseConfig(): AppConfig {
 		workers?: number;
 		dpi?: number;
 		resumeFrom: number;
-		outputDir?: string;
+		withImages: boolean;
 	}>();
 	const pdfPath = program.args[0];
 
@@ -66,8 +65,8 @@ export function parseConfig(): AppConfig {
 		maxRetries: yamlConfig.max_retries ?? 3,
 		retryBackoff: yamlConfig.retry_backoff ?? 2,
 		logLevel: yamlConfig.log_level ?? "INFO",
-		outputDir: args.outputDir ?? yamlConfig.output_dir ?? "output",
 		resumeFrom: args.resumeFrom,
 		mermaidMaxRetries: yamlConfig.mermaid_max_retries ?? 2,
+		withImages: args.withImages,
 	};
 }
