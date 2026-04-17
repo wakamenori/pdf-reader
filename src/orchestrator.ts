@@ -1,9 +1,10 @@
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import pLimit from "p-limit";
 import { assembleFinalMd } from "./assembler.js";
 import { parseConfig } from "./config.js";
 import { getGeminiPatch } from "./gemini-client.js";
+import { initLogger, logger } from "./logger.js";
 import { draftMarkdown } from "./markdown-drafter.js";
 import { validateAndFixMermaid } from "./mermaid-validator.js";
 import { storePage } from "./page-store.js";
@@ -21,30 +22,6 @@ function formatTimestamp(): string {
 	return `${y}${mo}${d}_${h}${mi}`;
 }
 
-function createLogger(logDir: string) {
-	mkdirSync(logDir, { recursive: true });
-	const logFile = path.join(logDir, "run.log");
-	writeFileSync(logFile, "", "utf-8");
-
-	return {
-		info(message: string) {
-			const line = `[${new Date().toISOString()}] INFO - ${message}`;
-			console.log(line);
-			appendFileSync(logFile, `${line}\n`, "utf-8");
-		},
-		warn(message: string) {
-			const line = `[${new Date().toISOString()}] WARN - ${message}`;
-			console.warn(line);
-			appendFileSync(logFile, `${line}\n`, "utf-8");
-		},
-		error(message: string) {
-			const line = `[${new Date().toISOString()}] ERROR - ${message}`;
-			console.error(line);
-			appendFileSync(logFile, `${line}\n`, "utf-8");
-		},
-	};
-}
-
 async function main() {
 	const config = parseConfig();
 	const timestamp = formatTimestamp();
@@ -57,7 +34,7 @@ async function main() {
 	mkdirSync(imagesDir, { recursive: true });
 
 	// ログ初期化(中間生成物と同じdirへ)
-	const logger = createLogger(runOutputDir);
+	initLogger(runOutputDir, config.logLevel);
 	logger.info(`Started processing: ${config.pdfPath}`);
 	logger.info(`Intermediate dir: ${runOutputDir}`);
 
@@ -67,10 +44,12 @@ async function main() {
 
 	// 再開ページ番号(1始まり→0始まりに変換)
 	const resumeFrom = Math.max(config.resumeFrom - 1, 0);
+	const totalToProcess = numPages - resumeFrom;
+	let completed = 0;
 
 	// Page Worker 処理
 	async function processPage(pageNum: number): Promise<[string, number]> {
-		logger.info(`Started page ${pageNum + 1}`);
+		logger.debug(`Started page ${pageNum + 1}`);
 
 		// 1. テキスト抽出
 		const draftMd = await extractTextLines(config.pdfPath, pageNum);
@@ -86,7 +65,7 @@ async function main() {
 			config.maxRetries,
 			config.retryBackoff,
 		);
-		logger.info(`Gemini patch cost: $${patchCost.toFixed(4)}`);
+		logger.debug(`Gemini patch cost: $${patchCost.toFixed(4)}`);
 		// 5. パッチ適用
 		const fixedMd = applyPatch(md, answer);
 		// 5.5 mermaid検証・修正
@@ -99,7 +78,8 @@ async function main() {
 		const price = patchCost + mermaidCost;
 		// 6. ページ保存
 		const pageMdPath = storePage(validatedMd, pageNum, pagesDir);
-		logger.info(`Finished page ${pageNum + 1}`);
+		completed++;
+		logger.info(`Finished page ${pageNum + 1} (${completed}/${totalToProcess})`);
 
 		return [pageMdPath, price];
 	}
@@ -135,6 +115,6 @@ async function main() {
 }
 
 main().catch((err) => {
-	console.error(err);
+	logger.error(`Fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
 	process.exit(1);
 });

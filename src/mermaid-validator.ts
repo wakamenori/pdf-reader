@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fixMermaidWithGemini } from "./gemini-client.js";
+import { logger } from "./logger.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -101,14 +102,14 @@ export async function validateAndFixMermaid(
 			continue;
 		}
 
-		console.log(`[Mermaid] 構文エラー検出:\n${validation.error}`);
+		logger.debug(`[Mermaid] 構文エラー検出:\n${validation.error}`);
 
 		let fixed: string | null = null;
 		let currentCode = normalizedCode;
 		let currentError = validation.error as string;
 
 		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			console.log(`[Mermaid] Geminiで修正を試行 (${attempt}/${maxRetries})`);
+			logger.debug(`[Mermaid] Geminiで修正を試行 (${attempt}/${maxRetries})`);
 
 			const [rawFixedCode, cost] = await fixMermaidWithGemini(currentCode, currentError, modelName, retryBackoff);
 			totalCost += cost;
@@ -117,11 +118,11 @@ export async function validateAndFixMermaid(
 			const revalidation = await validateMermaid(fixedCode);
 			if (revalidation.valid) {
 				fixed = fixedCode;
-				console.log(`[Mermaid] 修正成功 (${attempt}回目)`);
+				logger.debug(`[Mermaid] 修正成功 (${attempt}回目)`);
 				break;
 			}
 
-			console.log(`[Mermaid] 修正後も構文エラー (${attempt}回目):\n${revalidation.error}`);
+			logger.debug(`[Mermaid] 修正後も構文エラー (${attempt}回目):\n${revalidation.error}`);
 			currentCode = fixedCode;
 			currentError = revalidation.error as string;
 		}
@@ -130,7 +131,7 @@ export async function validateAndFixMermaid(
 			const replacement = `\`\`\`mermaid\n${fixed}\`\`\``;
 			result = result.slice(0, block.start) + replacement + result.slice(block.end);
 		} else {
-			console.warn(`[Mermaid] ${maxRetries}回の修正に失敗。<alt_image>にフォールバックします。`);
+			logger.warn(`[Mermaid] ${maxRetries}回の修正に失敗。<alt_image>にフォールバックします。`);
 			const fallback = `<alt_image title="図">\n${block.code.trim()}\n</alt_image>`;
 			result = result.slice(0, block.start) + fallback + result.slice(block.end);
 		}

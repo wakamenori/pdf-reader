@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { logger } from "./logger.js";
 
 /**
  * 閉じられていないコードブロックを検出し、末尾に閉じタグを追加する。
@@ -17,7 +18,7 @@ function fixUnclosedCodeBlocks(pageMd: string, pageNum: number): string {
 	}
 	if (openCount > closeCount) {
 		const missing = openCount - closeCount;
-		console.warn(`Page ${pageNum}: ${missing}個の閉じられていないコードブロックを検出。自動で閉じます。`);
+		logger.warn(`Page ${pageNum}: ${missing}個の閉じられていないコードブロックを検出。自動で閉じます。`);
 		pageMd += "\n```".repeat(missing);
 	}
 	return pageMd;

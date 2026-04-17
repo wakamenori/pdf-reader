@@ -3,6 +3,8 @@ import { Command } from "commander";
 import dotenv from "dotenv";
 import YAML from "yaml";
 
+import type { LogLevel } from "./logger.js";
+
 export interface AppConfig {
 	pdfPath: string;
 	workers: number;
@@ -10,10 +12,18 @@ export interface AppConfig {
 	geminiModel: string;
 	maxRetries: number;
 	retryBackoff: number;
-	logLevel: string;
+	logLevel: LogLevel;
 	resumeFrom: number;
 	mermaidMaxRetries: number;
 	withImages: boolean;
+}
+
+function normalizeLogLevel(value: string | undefined): LogLevel {
+	const lower = (value ?? "info").toLowerCase();
+	if (lower === "debug" || lower === "info" || lower === "warn" || lower === "error") {
+		return lower;
+	}
+	return "info";
 }
 
 interface YamlConfig {
@@ -44,6 +54,7 @@ export function parseConfig(): AppConfig {
 		.option("--dpi <number>", "画像DPI", Number.parseInt)
 		.option("--resume-from <number>", "このページ番号から再開(1始まり)", Number.parseInt, 1)
 		.option("--with-images", "ページ画像付きの .with-images.md も出力する", false)
+		.option("--verbose", "diff や Gemini レスポンスなど詳細ログを console に出す", false)
 		.parse();
 
 	const args = program.opts<{
@@ -52,6 +63,7 @@ export function parseConfig(): AppConfig {
 		dpi?: number;
 		resumeFrom: number;
 		withImages: boolean;
+		verbose: boolean;
 	}>();
 	const pdfPath = program.args[0];
 
@@ -64,7 +76,7 @@ export function parseConfig(): AppConfig {
 		geminiModel: yamlConfig.gemini_model ?? "gemini-3.1-flash-lite-preview",
 		maxRetries: yamlConfig.max_retries ?? 3,
 		retryBackoff: yamlConfig.retry_backoff ?? 2,
-		logLevel: yamlConfig.log_level ?? "INFO",
+		logLevel: args.verbose ? "debug" : normalizeLogLevel(yamlConfig.log_level),
 		resumeFrom: args.resumeFrom,
 		mermaidMaxRetries: yamlConfig.mermaid_max_retries ?? 2,
 		withImages: args.withImages,

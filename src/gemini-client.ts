@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type GenerateContentResponse, GoogleGenAI } from "@google/genai";
 import { z } from "zod/v4";
+import { logger } from "./logger.js";
 import { type Answer, AnswerSchema, getAnswerJsonSchema } from "./models.js";
 
 function createGeminiClient(): GoogleGenAI {
@@ -92,13 +93,13 @@ export async function getGeminiPatch(
 
 			const parsed = JSON.parse(responseText);
 			const answer = AnswerSchema.parse(parsed);
-			console.log(JSON.stringify(answer, null, 2));
+			logger.debug(JSON.stringify(answer, null, 2));
 
 			return [answer, calculateCost(response)];
 		} catch (e) {
 			lastException = e as Error;
 			const waitTime = retryBackoff * 2 ** (attempt - 1);
-			console.log(`[Gemini] エラー発生(${attempt}回目): ${e}. ${waitTime}秒後にリトライします。`);
+			logger.debug(`[Gemini] エラー発生(${attempt}回目): ${e}. ${waitTime}秒後にリトライします。`);
 			await new Promise((resolve) => setTimeout(resolve, waitTime * 1000));
 		}
 	}
@@ -166,7 +167,7 @@ export async function fixMermaidWithGemini(
 		} catch (e) {
 			lastException = e as Error;
 			const waitTime = retryBackoff * 2 ** (attempt - 1);
-			console.log(`[Mermaid Fix] API エラー(${attempt}回目): ${e}. ${waitTime}秒後にリトライします。`);
+			logger.debug(`[Mermaid Fix] API エラー(${attempt}回目): ${e}. ${waitTime}秒後にリトライします。`);
 			await new Promise((resolve) => setTimeout(resolve, waitTime * 1000));
 		}
 	}

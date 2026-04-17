@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { diffLines } from "diff";
+import { logger } from "./logger.js";
 import type { Answer } from "./models.js";
 
 /**
@@ -95,8 +96,7 @@ export function applyPatch(md: string, answer: Answer): string {
 	const filteredLines = mdLines.filter((mdLine): mdLine is string => mdLine !== null);
 	const afterMd = filteredLines.join("\n");
 
-	console.log("\n===== ページ全体の差分 =====");
-	console.log(colorDiff(beforeMd, afterMd));
+	logger.debug(`\n===== ページ全体の差分 =====\n${colorDiff(beforeMd, afterMd)}`);
 
 	return afterMd;
 }
