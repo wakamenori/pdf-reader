@@ -16,6 +16,12 @@ export interface MermaidBlock {
 	end: number;
 }
 
+export interface MermaidFailure {
+	pageNum: number;
+	code: string;
+	error: string;
+}
+
 /**
  * Markdownから ```mermaid ブロックを全て抽出する。
  * 行番号プレフィックス（L001: ）付きのケースにも対応する。
@@ -79,14 +85,15 @@ export async function validateAndFixMermaid(
 	maxRetries: number,
 	retryBackoff: number,
 	pageNum: number,
-): Promise<{ md: string; cost: number }> {
+): Promise<{ md: string; cost: number; failures: MermaidFailure[] }> {
 	const blocks = extractMermaidBlocks(md);
 	if (blocks.length === 0) {
-		return { md, cost: 0 };
+		return { md, cost: 0, failures: [] };
 	}
 
 	let totalCost = 0;
 	let result = md;
+	const failures: MermaidFailure[] = [];
 
 	// 後ろから置換することでインデックスがずれない
 	for (let i = blocks.length - 1; i >= 0; i--) {
@@ -132,11 +139,13 @@ export async function validateAndFixMermaid(
 			const replacement = `\`\`\`mermaid\n${fixed}\`\`\``;
 			result = result.slice(0, block.start) + replacement + result.slice(block.end);
 		} else {
-			logger.warn(
+			logger.file(
+				"warn",
 				`[Mermaid] p.${pageNum + 1} ${maxRetries}回の修正に失敗。元のコードブロックのまま残します。`,
 			);
+			failures.push({ pageNum, code: block.code, error: currentError });
 		}
 	}
 
-	return { md: result, cost: totalCost };
+	return { md: result, cost: totalCost, failures };
 }

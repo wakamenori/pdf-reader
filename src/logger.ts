@@ -43,4 +43,10 @@ export const logger = {
 	error(message: string) {
 		emit("error", message, console.error);
 	},
+	file(level: LogLevel, message: string) {
+		const line = `[${new Date().toISOString()}] ${level.toUpperCase()} - ${message}`;
+		if (logFile) {
+			appendFileSync(logFile, `${line}\n`, "utf-8");
+		}
+	},
 };

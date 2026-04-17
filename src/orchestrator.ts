@@ -6,7 +6,7 @@ import { parseConfig } from "./config.js";
 import { getGeminiPatch } from "./gemini-client.js";
 import { initLogger, logger } from "./logger.js";
 import { draftMarkdown } from "./markdown-drafter.js";
-import { validateAndFixMermaid } from "./mermaid-validator.js";
+import { type MermaidFailure, validateAndFixMermaid } from "./mermaid-validator.js";
 import { storePage } from "./page-store.js";
 import { applyPatch } from "./patch-applier.js";
 import { rasterizePage } from "./rasterizer.js";
@@ -20,6 +20,23 @@ function formatTimestamp(): string {
 	const h = String(now.getHours()).padStart(2, "0");
 	const mi = String(now.getMinutes()).padStart(2, "0");
 	return `${y}${mo}${d}_${h}${mi}`;
+}
+
+function renderProgress(done: number, total: number, cost: number): void {
+	const costStr = `$${cost.toFixed(4)}`;
+	if (!process.stdout.isTTY) {
+		if (done === total) {
+			console.log(`Pages ${done}/${total}  cost: ${costStr}`);
+		}
+		return;
+	}
+	const width = 24;
+	const filled = Math.min(Math.round((done / total) * width), width);
+	const bar = "=".repeat(filled) + " ".repeat(width - filled);
+	process.stdout.write(`\rPages [${bar}] ${done}/${total}  cost: ${costStr}`);
+	if (done === total) {
+		process.stdout.write("\n");
+	}
 }
 
 async function main() {
@@ -46,10 +63,14 @@ async function main() {
 	const resumeFrom = Math.max(config.resumeFrom - 1, 0);
 	const totalToProcess = numPages - resumeFrom;
 	let completed = 0;
+	let runningCost = 0;
+	const mermaidFailures: MermaidFailure[] = [];
+
+	renderProgress(0, totalToProcess, 0);
 
 	// Page Worker 処理
 	async function processPage(pageNum: number): Promise<[string, number]> {
-		logger.debug(`Started page ${pageNum + 1}`);
+		logger.file("debug", `Started page ${pageNum + 1}`);
 
 		// 1. テキスト抽出
 		const draftMd = await extractTextLines(config.pdfPath, pageNum);
@@ -65,22 +86,31 @@ async function main() {
 			config.maxRetries,
 			config.retryBackoff,
 		);
-		logger.debug(`Gemini patch cost: $${patchCost.toFixed(4)}`);
+		logger.file("debug", `Gemini patch cost: $${patchCost.toFixed(4)}`);
 		// 5. パッチ適用
 		const fixedMd = applyPatch(md, answer);
 		// 5.5 mermaid検証・修正
-		const { md: validatedMd, cost: mermaidCost } = await validateAndFixMermaid(
+		const {
+			md: validatedMd,
+			cost: mermaidCost,
+			failures,
+		} = await validateAndFixMermaid(
 			fixedMd,
 			config.geminiModel,
 			config.mermaidMaxRetries,
 			config.retryBackoff,
 			pageNum,
 		);
+		if (failures.length > 0) {
+			mermaidFailures.push(...failures);
+		}
 		const price = patchCost + mermaidCost;
 		// 6. ページ保存
 		const pageMdPath = storePage(validatedMd, pageNum, pagesDir);
 		completed++;
-		logger.info(`Finished page ${pageNum + 1} (${completed}/${totalToProcess})`);
+		runningCost += price;
+		logger.file("info", `Finished page ${pageNum + 1} (${completed}/${totalToProcess})`);
+		renderProgress(completed, totalToProcess, runningCost);
 
 		return [pageMdPath, price];
 	}
@@ -112,6 +142,14 @@ async function main() {
 	logger.info(`Output: ${purePath}`);
 	if (withImagesPath) {
 		logger.info(`Output (with images): ${withImagesPath}`);
+	}
+
+	if (mermaidFailures.length > 0) {
+		logger.warn(`Mermaid修正失敗: ${mermaidFailures.length}件`);
+		for (const f of mermaidFailures) {
+			const firstErrLine = f.error.split("\n").find((l) => l.trim().length > 0) ?? "";
+			logger.warn(`  p.${f.pageNum + 1}: ${firstErrLine}`);
+		}
 	}
 }
 
