@@ -2,50 +2,49 @@
 
 ## 概要
 
-スキャンを含むPDFを解析し、校正済みMarkdown (`final.md`)とページ画像をローカルに出力するエンドツーエンドの変換パイプラインです。
+スキャンを含むPDFを解析し、Google Gemini による校正を経て Markdown に変換するエンドツーエンドのパイプラインです。TypeScript 実装で Node.js >= 22 上で動作します。
+
+成果物は **入力PDFと同じディレクトリ** に `<pdf名>.md` として書き出され、中間生成物とログは `/tmp/pdf-reader/<timestamp>/` に保存されます。
 
 ## セットアップ
 
 ### 1. Popplerのインストール（必須）
 
+ページ画像のラスタライズに利用します。
+
 - macOS: `brew install poppler`
 - Ubuntu: `sudo apt-get install poppler-utils`
 
-### 2. 仮想環境作成 & 依存インストール（推奨）
+### 2. 依存インストール
 
 ```bash
-# Makefileを使用（推奨）
+# Makefile（推奨）
 make setup
 
-# または直接uvを使用
-uv venv .venv
-source .venv/bin/activate
-uv sync
+# または直接
+pnpm install
 ```
 
-### 3. .envファイルの作成
+### 3. .env ファイルの作成
 
-`.env` にGemini APIキーを記載してください。
+Gemini API キーを `.env` に設定してください。
 
 ```env
-GOOGLE_GENAI_USE_VERTEXAI=true
-GOOGLE_CLOUD_LOCATION=us-central1
-GOOGLE_CLOUD_PROJECT=<your-project-id>
-GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_VERTEX_AI=<json_text>
+GEMINI_API_KEY=<your-api-key>
 ```
 
 ### 4. 設定ファイル
 
-`configs/config.yaml` を編集して各種パラメータを調整できます。
+`configs/config.yaml` で各種パラメータを調整できます。
 
 ```yaml
 dpi: 300
 workers: 4
-gemini_model: "gemini-2.5-flash-preview-04-17"
+gemini_model: "gemini-3.1-flash-lite-preview"
 max_retries: 3
-retry_backoff: 2
+retry_backoff: 2            # 初回1秒, 次回2秒, その次4秒…
 log_level: "INFO"
-output_dir: "output"
+mermaid_max_retries: 5      # mermaid構文エラー時のGemini修正リトライ回数
 ```
 
 ## 使い方
@@ -53,71 +52,67 @@ output_dir: "output"
 ### 基本実行
 
 ```bash
-# Makefileを使用（推奨）
+# Makefile（推奨）
 make run PDF=sample.pdf
 
-# または直接uvを使用
-uv run python src/orchestrator.py sample.pdf
+# または直接
+pnpm tsx src/orchestrator.ts sample.pdf
 ```
 
 ### オプション付き実行
 
 ```bash
-# Makefileを使用（推奨）
 make run PDF=sample.pdf ARGS="--config configs/config.yaml --workers 6 --dpi 400"
-make run PDF=sample.pdf ARGS="--resume-from 5"
-
-# または直接uvを使用
-uv run python src/orchestrator.py sample.pdf \
-  --config configs/config.yaml \
-  --workers 6 \
-  --dpi 400 \
-  --resume-from 5
+make run PDF=sample.pdf ARGS="--resume-from 10"
+make run PDF=sample.pdf ARGS="--with-images"
+make run PDF=sample.pdf ARGS="--verbose"
 ```
 
-- CLI引数が未指定の場合は `config.yaml` の値を使用します。
+CLI引数が未指定の場合は `config.yaml` の値を使用します。
+
+| オプション | 説明 |
+| --- | --- |
+| `--config <path>` | 設定ファイルパス（既定 `configs/config.yaml`） |
+| `--workers <n>` | 並列ワーカー数 |
+| `--dpi <n>` | 画像DPI |
+| `--resume-from <n>` | 指定ページ番号（1始まり）から再開 |
+| `--with-images` | ページ画像付きの `.with-images.md` も出力する |
+| `--verbose` | diff や Gemini レスポンスなど詳細ログを console に出す |
 
 ### 開発・メンテナンス
 
 ```bash
-# Makefileを使用（推奨）
-make lint         # リント実行
-make format       # フォーマット実行
-make typecheck    # 型チェック実行
-make test         # テスト実行
-make clean        # 出力ファイル削除
-
-# または直接uvを使用
-uv run ruff check src/        # リント実行
-uv run ruff format src/       # フォーマット実行
-uv run mypy src/ --ignore-missing-imports  # 型チェック実行
+make lint         # Biome による lint
+make format       # Biome による format
+make typecheck    # tsc --noEmit
+make test         # vitest run
+make clean        # /tmp/pdf-reader と dist を削除
 ```
-
-### 利用可能なコマンド
 
 ```bash
-make help    # 利用可能なコマンド一覧を表示
+make help         # 利用可能なコマンド一覧
 ```
 
-## ディレクトリ構成
+## 出力構成
 
 ```text
-project/
-├── configs/
-│   └── config.yaml
-├── .env
-├── requirements.txt
-├── src/
-│   ├── orchestrator.py
-│   ├── text_extractor.py
-│   ├── markdown_drafter.py
-│   ├── rasterizer.py
-│   ├── gemini_client.py
-│   ├── patch_applier.py
-│   └── assembler.py
-└── output/
-    └── <timestamp>/
-        ├── pages/
-        ├── images/
-        └── final.md
+<input PDF dir>/
+├── sample.pdf
+├── sample.md                  # pure markdown（デフォルト出力）
+├── sample.with-images.md      # --with-images 指定時のみ
+└── sample_images/             # --with-images 指定時のみ（ページ画像）
+
+/tmp/pdf-reader/YYYYMMDD_HHMM/
+├── pages/                     # ページ別中間markdown
+├── images/                    # ページ画像（ラスタライズ結果）
+└── run.log                    # 実行ログ
 ```
+
+同名ファイルが既に存在する場合は `sample_2.md`, `sample_3.md`... と連番が付与されます。
+
+## 必要環境
+
+- **Node.js**: >= 22.0.0
+- **pnpm**
+- **Poppler**（`pdftoppm` 等を利用）
+- **Gemini API Key**（`.env` の `GEMINI_API_KEY`）
